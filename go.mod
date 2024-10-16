@@ -5,6 +5,7 @@ go 1.23.2
 require (
 	github.com/antchfx/htmlquery v1.3.3
 	github.com/gin-gonic/gin v1.10.0
+	github.com/joho/godotenv v1.5.1
 )
 
 require (

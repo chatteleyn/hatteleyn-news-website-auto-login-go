@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/antchfx/htmlquery"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -165,7 +166,9 @@ func authenticate(targetURL string, login map[string]string, client *http.Client
 }
 
 func main() {
+	godotenv.Load(".env")
 	config := readConfigFile("websites_config.json")
+
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{
 		Jar: jar,
