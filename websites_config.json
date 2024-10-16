@@ -1,0 +1,50 @@
+{
+  "websites": {
+    "www.mediapart.fr": {
+      "login_url": "https://www.mediapart.fr/login_check",
+      "login": {
+        "email": "$EMAIL$",
+        "password": "$PASSWORD$"
+      },
+      "not_logged_in": "xpath(//div[contains(@class, 'paywall-login')])",
+      "prefix": "[Mediapart]",
+      "strip": [
+        "xpath(//aside)",
+        "xpath(//span[@data-nosnippet])",
+        "xpath(//figure[contains(@class, 'media--rich-audiomeans')])",
+        "xpath(//h2[contains(@class, 'subheading-bullet-point')])",
+        "xpath(//link[@rel='canonical'])",
+        "xpath(//meta[@property='og:url'])"
+      ],
+      "move": [
+        [
+          "xpath(//p[contains(@class, 'news__heading__top__intro')])",
+          "xpath(//div[contains(@class, 'news__body__center__article')])",
+          "inside-up"
+        ]
+      ]
+    },
+    "www.monde-diplomatique.fr": {
+      "login_url": "https://www.monde-diplomatique.fr/connexion/",
+      "login": {
+        "email": "$EMAIL$",
+        "mot_de_passe": "$PASSWORD$",
+        "valider": "Se+connecter",
+        "session_remember": "oui",
+        "formulaire_action": "identification_lecteur_ws",
+        "retour": "https://www.monde-diplomatique.fr/",
+        "email_nobot": "",
+        "formulaire_action_args": "xpath(//form//input[@name='formulaire_action_args']/@value)",
+        "_jeton": "xpath(//form//input[@name='_jeton']/@value)"
+      },
+      "not_logged_in": "xpath(//div[@id='paywall'])",
+      "prefix": "[Diplo]",
+      "strip": [
+        "xpath(//div[contains(@class, 'bandeautitre')])",
+        "xpath(//div[contains(@class, 'dates_auteurs')])",
+        "xpath(//link[@rel='canonical'])",
+        "xpath(//meta[@property='og:url'])"
+      ]
+    }
+  }
+}
