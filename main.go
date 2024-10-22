@@ -2,10 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/antchfx/htmlquery"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/net/html"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -49,13 +49,39 @@ func setup(config *Config, client *http.Client) *gin.Engine {
 			if err != nil {
 				panic(err)
 			}
-			if !inConfig || (inConfig && websiteConfig.NotLoggedIn != "" && htmlquery.FindOne(xml, regexp.MustCompile(xpathRE).FindStringSubmatch(websiteConfig.NotLoggedIn)[1]) == nil) {
+			// Check if the website has a config
+			if !inConfig {
 				// If not, return the original content
 				c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 			} else {
-				authenticate(websiteConfig.LoginURL, websiteConfig.Login, client)
+				// Authenticate only if not logged in
+				if websiteConfig.NotLoggedIn == "" || htmlquery.FindOne(xml, regexp.MustCompile(xpathRE).FindStringSubmatch(websiteConfig.NotLoggedIn)[1]) != nil {
+					authenticate(websiteConfig.LoginURL, websiteConfig.Login, client)
+				}
 				content = getContent(urlDecoded, client)
-				c.Data(http.StatusOK, "text/html; charset=utf-8", content)
+				xml, err = html.Parse(strings.NewReader(string(content)))
+
+				// Remove elements from the HTML page
+				if len(websiteConfig.Strip) > 0 {
+					xpathList := websiteConfig.Strip
+					for index, value := range xpathList {
+						xpathList[index] = regexp.MustCompile(xpathRE).FindStringSubmatch(value)[1]
+					}
+					xml = removeElements(xml, xpathList)
+				}
+
+				// Move elements from the HTML page
+				if len(websiteConfig.Move) > 0 {
+					xpathList := websiteConfig.Move
+					for _, values := range xpathList {
+						for index, value := range values[:2] {
+							values[index] = regexp.MustCompile(xpathRE).FindStringSubmatch(value)[1]
+						}
+					}
+					xml = moveElements(xml, xpathList)
+				}
+
+				c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(htmlquery.OutputHTML(xml, true)))
 			}
 
 			//c.Data(http.StatusOK, "text/html; charset=utf-8", getContent(urlDecoded, client))
@@ -87,7 +113,21 @@ func readConfigFile(file string) *Config {
 }
 
 func getContent(targetURL string, client *http.Client) []byte {
-	resp, err := client.Get(targetURL)
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	targetURLParsed, err := url.Parse(targetURL)
+	if err != nil {
+		panic(err)
+	}
+	for _, cookie := range client.Jar.Cookies(targetURLParsed) {
+		req.AddCookie(cookie)
+	}
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		panic(err)
 	}
@@ -129,10 +169,6 @@ func authenticate(targetURL string, login map[string]string, client *http.Client
 			values.Set(key, value)
 		}
 	}
-	//resp, err := client.PostForm(targetURL, values)
-	//if err != nil {
-	//	panic(err)
-	//}
 
 	req, err := http.NewRequest("POST", targetURL, strings.NewReader(values.Encode()))
 	if err != nil {
@@ -160,9 +196,42 @@ func authenticate(targetURL string, login map[string]string, client *http.Client
 		panic(err)
 	}
 
-	fmt.Println(req.Header.Get("User-Agent"))
-
 	return body
+}
+
+func removeElements(xml *html.Node, xpathList []string) *html.Node {
+	for _, xpath := range xpathList {
+		nodes := htmlquery.Find(xml, xpath)
+		for _, node := range nodes {
+			node.Parent.RemoveChild(node)
+			//xml.RemoveChild(node)
+		}
+	}
+
+	return xml
+}
+
+func moveElements(xml *html.Node, xpathList [][]string) *html.Node {
+	for _, values := range xpathList {
+		target := htmlquery.FindOne(xml, values[0])
+		dest := htmlquery.FindOne(xml, values[1])
+		pos := values[2]
+
+		target.Parent.RemoveChild(target)
+
+		switch pos {
+		case "inside-up":
+			dest.Parent.InsertBefore(target, dest)
+		case "inside-down":
+			dest.Parent.InsertBefore(target, dest.NextSibling)
+		case "outside-up":
+			dest.Parent.Parent.InsertBefore(target, dest.Parent)
+		case "outside-down":
+			dest.Parent.Parent.InsertBefore(target, dest.Parent.NextSibling)
+		}
+	}
+
+	return xml
 }
 
 func main() {
